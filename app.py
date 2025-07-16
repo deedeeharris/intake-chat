@@ -20,7 +20,6 @@ st.markdown("""
         width: 250px;
         padding: 20px;
     }
-    /* Custom CSS to move the send button to the left */
     .stChatInput > div {
         flex-direction: row-reverse;
     }
@@ -40,11 +39,10 @@ def check_password():
 
     if not st.session_state.get("password_correct"):
         st.text_input("Password", type="password", on_change=password_entered, key="password")
-        return False
+        st.stop()
     return True
 
-if not check_password():
-    st.stop()
+check_password()
 
 # ====== OpenAI Configuration ======
 try:
@@ -66,13 +64,12 @@ except KeyError as e:
 with st.sidebar:
     st.header("אפשרויות")
     if st.button("שיחה חדשה"):
-        # Clear all session state and rerun
         st.session_state.clear()
         st.rerun()
 
     if st.session_state.get("messages"):
         if st.button("נתח את כל השיחה לפי קטגוריות"):
-            # ... (analysis logic remains the same)
+            # Analysis logic remains the same
             chat_history_text = "\n".join(
                 [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
             )
@@ -96,53 +93,43 @@ with st.sidebar:
                 except Exception as e:
                     st.error(f"Error during analysis: {e}")
 
-# ====== Chat Initialization & First Message ======
+# ====== Chat Initialization & First Message LOGIC ======
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# If the chat is empty, send the initial greeting from the AI
+# If the chat is empty, fetch the initial greeting but DO NOT display it here.
 if not st.session_state.messages:
-    try:
-        with st.chat_message("assistant"):
-            with st.spinner("מכין את הצ'אט..."):
-                response_placeholder = st.empty()
-                full_response = ""
-                # Hidden prompt to make the AI start the conversation
-                initial_prompt = [
-                    {"role": "system", "content": INTAKE_SYSTEM_PROMPT},
-                    {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
-                ]
-                stream = client.chat.completions.create(
-                    model="gpt-4-turbo",
-                    messages=initial_prompt,
-                    stream=True,
-                )
-                for chunk in stream:
-                    content = chunk.choices[0].delta.content
-                    if content:
-                        full_response += content
-                        response_placeholder.markdown(full_response + "▌")
-                response_placeholder.markdown(full_response)
-        # Add the AI's first message to the session state
-        st.session_state.messages.append({"role": "assistant", "content": full_response})
-    except Exception as e:
-        st.error(f"An error occurred while starting the chat: {e}")
-        st.stop()
+    with st.spinner("מכין את הצ'אט..."):
+        try:
+            initial_prompt = [
+                {"role": "system", "content": INTAKE_SYSTEM_PROMPT},
+                {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
+            ]
+            response = client.chat.completions.create(
+                model="gpt-4-turbo",
+                messages=initial_prompt,
+            )
+            initial_message = response.choices[0].message.content
+            # Add the AI's first message to the session state
+            st.session_state.messages.append({"role": "assistant", "content": initial_message})
+            # Rerun the script to display the message from the history
+            st.rerun()
+        except Exception as e:
+            st.error(f"An error occurred while starting the chat: {e}")
+            st.stop()
 
-# ====== Display Full Chat History ======
-# This will now include the initial message on the first run
+# ====== Display Full Chat History (Single Source of Truth) ======
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 # ====== Handle User Input ======
 if prompt := st.chat_input("כתבו כאן..."):
-    # Add user message to state and display it
     st.session_state.messages.append({"role": "user", "content": prompt})
+    # Display the user's message immediately
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Prepare messages for the API call
     messages_for_api = [{"role": "system", "content": INTAKE_SYSTEM_PROMPT}]
     messages_for_api.extend(st.session_state.messages)
 
@@ -161,7 +148,6 @@ if prompt := st.chat_input("כתבו כאן..."):
                     full_response += content
                     response_placeholder.markdown(full_response + "▌")
             response_placeholder.markdown(full_response)
-        # Add the final assistant response to the message history
         st.session_state.messages.append({"role": "assistant", "content": full_response})
     except Exception as e:
         st.error(f"An error occurred: {e}")
