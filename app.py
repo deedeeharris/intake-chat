@@ -65,7 +65,7 @@ except Exception as e:
     st.stop()
 
 
-ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"] """
+ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"]
 
 # ====== Sidebar ======
 with st.sidebar:
