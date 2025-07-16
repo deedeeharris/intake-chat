@@ -95,7 +95,7 @@ with st.sidebar:
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4.1-turbo", # Using a powerful model for analysis
+                        model="gpt-4.1", # Using a powerful model for analysis
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -135,9 +135,9 @@ if prompt := st.chat_input("כתבו כאן..."):
         with st.spinner("חושב..."):
             # Call the ChatCompletion API
             response = client.chat.completions.create(
-                model="gpt-4.1-turbo", # Specify the desired model
+                model="gpt-4.1", # Specify the desired model
                 messages=messages_for_api,
-                temperature=0.7, # Adjust temperature as needed for conversation
+                temperature=0.3, # Adjust temperature as needed for conversation
                 max_tokens=1000
             )
             assistant_msg = response.choices[0].message.content
