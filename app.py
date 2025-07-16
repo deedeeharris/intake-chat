@@ -68,19 +68,62 @@ except KeyError as e:
     st.stop()
 
 # ====== Initial Welcome Popup (Modal Dialog) ======
-@st.dialog("ברוכים הבאים!")
-def show_intro():
-    st.markdown("""
-    👋 **ברוכים הבאים!**
+# ====== Initial Welcome Popup (Persistent Modal) ======
 
-    💡 זהו Proof of Concept (POC).
+# We will use a placeholder to control the modal's visibility
+modal_placeholder = st.empty()
 
-    📝 המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.
+if not st.session_state.get("intro_shown", False):
+    with modal_placeholder.container():
+        # CSS to style the modal and the overlay
+        st.markdown("""
+            <style>
+                /* The Modal (background) */
+                .modal {
+                    position: fixed; /* Stay in place */
+                    z-index: 999; /* Sit on top */
+                    left: 0;
+                    top: 0;
+                    width: 100%; /* Full width */
+                    height: 100%; /* Full height */
+                    overflow: auto; /* Enable scroll if needed */
+                    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
+                }
 
-    📊 כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.
-    """)
-    if st.button("הבנתי, נתחיל"):
-        st.rerun()
+                /* Modal Content/Box */
+                .modal-content {
+                    background-color: #fefefe;
+                    margin: 15% auto; /* 15% from the top and centered */
+                    padding: 20px;
+                    border: 1px solid #888;
+                    width: 80%;
+                    max-width: 500px;
+                    border-radius: 10px;
+                    text-align: right; /* RTL text alignment */
+                }
+            </style>
+        """, unsafe_allow_html=True)
+
+        # The modal HTML structure
+        st.markdown("""
+            <div class="modal">
+                <div class="modal-content">
+                    <h2>ברוכים הבאים! 👋</h2>
+                    <p>💡 זהו Proof of Concept (POC).</p>
+                    <p>📝 המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.</p>
+                    <p>📊 כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.</p>
+                </div>
+            </div>
+        """, unsafe_allow_html=True)
+
+        # The button to close the modal
+        if st.button("הבנתי, נתחיל", key="start_app"):
+            st.session_state.intro_shown = True
+            modal_placeholder.empty() # Clear the modal
+            st.rerun() # Rerun the script to show the main app
+
+    # Stop the rest of the app from running until the user clicks the button
+    st.stop()
 
 
 if "intro_shown" not in st.session_state:
