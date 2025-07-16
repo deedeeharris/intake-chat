@@ -58,21 +58,26 @@ if not check_password():
 # ====== OpenAI Configuration ======
 try:
     OPENAI_API_KEY = st.secrets["openai_api_key"]
-    ASSISTANT_ID = st.secrets["assistant_id"]
     client = OpenAI(api_key=OPENAI_API_KEY)
 except Exception as e:
     st.error(f"Error initializing OpenAI: {e}")
     st.stop()
 
+# ====== Prompts ======
+try:
+    ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"]
+    INTAKE_SYSTEM_PROMPT = st.secrets["INTAKE_SYSTEM_PROMPT"]
+except KeyError as e:
+    st.error(f"Secret key not found: {e}. Please ensure ANALYSIS_PROMPT_HE and INTAKE_SYSTEM_PROMPT are set in your Streamlit secrets.")
+    st.stop()
 
-ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"]
 
 # ====== Sidebar ======
 with st.sidebar:
     st.header("אפשרויות")
     if st.button("שיחה חדשה"):
         st.session_state.clear()
-        st.experimental_rerun()
+        st.rerun()
 
     if "messages" in st.session_state and st.session_state.messages:
         if st.button("נתח את כל השיחה לפי קטגוריות"):
@@ -90,7 +95,7 @@ with st.sidebar:
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4.1",
+                        model="gpt-4.1-turbo", # Using a powerful model for analysis
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -105,14 +110,8 @@ with st.sidebar:
 
 
 # ====== Chat Initialization ======
-if "thread_id" not in st.session_state:
-    try:
-        thread = client.beta.threads.create()
-        st.session_state.thread_id = thread.id
-        st.session_state.messages = []
-    except Exception as e:
-        st.error(f"Error creating new thread: {e}")
-        st.stop()
+if "messages" not in st.session_state:
+    st.session_state.messages = []
 
 
 # ====== Display Chat History ======
@@ -126,36 +125,30 @@ if prompt := st.chat_input("כתבו כאן..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    try:
-        client.beta.threads.messages.create(
-            thread_id=st.session_state.thread_id,
-            role="user",
-            content=prompt
-        )
-        with st.spinner("חושב..."):
-            run = client.beta.threads.runs.create(
-                thread_id=st.session_state.thread_id,
-                assistant_id=ASSISTANT_ID,
-            )
-            while run.status != "completed":
-                time.sleep(0.5)
-                run = client.beta.threads.runs.retrieve(
-                    thread_id=st.session_state.thread_id,
-                    run_id=run.id
-                )
-                if run.status == "failed":
-                    st.error("האסיסטנט נכשל בשליחה.")
-                    break
+    # Construct the message history for the API call
+    # The system prompt is always first
+    messages_for_api = [{"role": "system", "content": INTAKE_SYSTEM_PROMPT}]
+    # Then add all the messages from the session state
+    messages_for_api.extend(st.session_state.messages)
 
-            messages = client.beta.threads.messages.list(
-                thread_id=st.session_state.thread_id
+    try:
+        with st.spinner("חושב..."):
+            # Call the ChatCompletion API
+            response = client.chat.completions.create(
+                model="gpt-4.1-turbo", # Specify the desired model
+                messages=messages_for_api,
+                temperature=0.7, # Adjust temperature as needed for conversation
+                max_tokens=1000
             )
-            assistant_msg = messages.data[0].content[0].text.value
+            assistant_msg = response.choices[0].message.content
+
             st.session_state.messages.append(
                 {"role": "assistant", "content": assistant_msg}
             )
             with st.chat_message("assistant"):
                 st.markdown(assistant_msg)
+            # We need to rerun to show the latest message immediately
+            st.rerun()
 
     except Exception as e:
         st.error(f"An error occurred: {e}")
