@@ -115,7 +115,7 @@ with st.sidebar:
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4o",
+                        model="gpt-4.1",
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -139,7 +139,7 @@ if not st.session_state.messages:
                 {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
             ]
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=initial_prompt,
                 temperature=0.3
 
@@ -170,7 +170,7 @@ if prompt := st.chat_input("כתבו כאן..."):
             response_placeholder = st.empty()
             full_response = ""
             stream = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=messages_for_api,
                 stream=True,
             )
