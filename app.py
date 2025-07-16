@@ -5,7 +5,8 @@ import time
 # ====== Page Configuration ======
 APP_TITLE = "אינטייק - תצוגת תכלית"
 st.set_page_config(page_title=APP_TITLE, layout="wide")
-st.title(APP_TITLE)
+# The main title is now part of the login screen, so we can remove it from here if we want
+# st.title(APP_TITLE) # You can uncomment this if you want the title on the main chat page too
 
 # ====== RTL Support ======
 st.markdown("""
@@ -23,33 +24,61 @@ st.markdown("""
     .stChatInput > div {
         flex-direction: row-reverse;
     }
-    /* Custom style for the dialog to ensure it is centered */
-    div[data-testid="stModal"] {
-        position: fixed;
-        left: 50%;
-        top: 50%;
-        transform: translate(-50%, -50%);
-    }
     </style>
 """, unsafe_allow_html=True)
 
-# ====== Login ======
-def check_password():
-    """Returns `True` if the user had the correct password."""
+
+# ====== NEW: Login & Introduction Function ======
+def show_login_screen():
+    """
+    Displays the combined login and introduction screen.
+    This function will take over the screen until the password is correct.
+    """
+    # Stop if the password is already correct
+    if st.session_state.get("password_correct", False):
+        return True
+
+    # --- UI for the Login Screen ---
+    st.title("אינטייק - תצוגת תכלית")
+    st.header("👋 ברוכים הבאים!")
+
+    # New, more detailed introduction
+    st.markdown("""
+    זוהי הדגמה (Proof of Concept) של מערכת אינטייק חכמה, המבוססת על צ'אט אינטראקטיבי.
+
+    **המטרה שלנו היא כפולה:**
+    1.  **לשפר את חווית המועמד/ת:** להחליף טפסים ארוכים ומייגעים בשיחה טבעית וזורמת שנעים יותר למלא.
+    2.  **לייעל את עבודת המדריכים:** המערכת אוספת את כל המידע מהשיחה, מנתחת אותו באופן אוטומטי, ומפיקה סיכום תובנות ממוקד. זה חוסך זמן יקר ומכין את המדריך לפגישה הראשונה בצורה מיטבית.
+
+    כדי להתחיל את ההדגמה, אנא הזינו את הסיסמה למטה.
+    """)
+
     def password_entered():
+        """Callback to check the password."""
         if st.session_state.get("password") == st.secrets.get("password"):
             st.session_state["password_correct"] = True
             if "password" in st.session_state:
                 del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
+            st.error("הסיסמה שהוזנה אינה נכונה.")
 
-    if not st.session_state.get("password_correct"):
-        st.text_input("Password", type="password", on_change=password_entered, key="password")
-        st.stop()
-    return True
+    # Password input field
+    st.text_input(
+        "סיסמה",
+        type="password",
+        on_change=password_entered,
+        key="password"
+    )
 
-check_password()
+    # This part is crucial: it stops the rest of the app from running
+    # until the password is correct.
+    st.stop()
+
+
+# --- Call the login screen at the very start of the script ---
+show_login_screen()
+
 
 # ====== OpenAI Configuration ======
 try:
@@ -67,86 +96,21 @@ except KeyError as e:
     st.error(f"Secret key not found: {e}. Please ensure all required secrets are set.")
     st.stop()
 
-# ====== Initial Welcome Popup (Modal Dialog) ======
-# ====== Initial Welcome Popup (Persistent Modal) ======
-
-# We will use a placeholder to control the modal's visibility
-modal_placeholder = st.empty()
-
-if not st.session_state.get("intro_shown", False):
-    with modal_placeholder.container():
-        # CSS to style the modal and the overlay
-        st.markdown("""
-            <style>
-                /* The Modal (background) */
-                .modal {
-                    position: fixed; /* Stay in place */
-                    z-index: 999; /* Sit on top */
-                    left: 0;
-                    top: 0;
-                    width: 100%; /* Full width */
-                    height: 100%; /* Full height */
-                    overflow: auto; /* Enable scroll if needed */
-                    background-color: rgba(0,0,0,0.4); /* Black w/ opacity */
-                }
-
-                /* Modal Content/Box */
-                .modal-content {
-                    background-color: #fefefe;
-                    margin: 15% auto; /* 15% from the top and centered */
-                    padding: 20px;
-                    border: 1px solid #888;
-                    width: 80%;
-                    max-width: 500px;
-                    border-radius: 10px;
-                    text-align: right; /* RTL text alignment */
-                }
-            </style>
-        """, unsafe_allow_html=True)
-
-        # The modal HTML structure
-        st.markdown("""
-            <div class="modal">
-                <div class="modal-content">
-                    <h2>ברוכים הבאים! 👋</h2>
-                    <p>💡 זהו Proof of Concept (POC).</p>
-                    <p>📝 המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.</p>
-                    <p>📊 כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.</p>
-                </div>
-            </div>
-        """, unsafe_allow_html=True)
-
-        # The button to close the modal
-        if st.button("הבנתי, נתחיל", key="start_app"):
-            st.session_state.intro_shown = True
-            modal_placeholder.empty() # Clear the modal
-            st.rerun() # Rerun the script to show the main app
-
-    # Stop the rest of the app from running until the user clicks the button
-    st.stop()
-
-
-if "intro_shown" not in st.session_state:
-    show_intro()
-    st.session_state.intro_shown = True
-    st.rerun()
+# ====== DELETED: The old toast/popup section is gone ======
 
 
 # ====== Sidebar ======
 with st.sidebar:
     st.header("אפשרויות")
     if st.button("שיחה חדשה"):
-        # Keep password correctness and intro shown status
-        password_correct = st.session_state.get("password_correct")
-        intro_shown = st.session_state.get("intro_shown")
+        # Clear session state but keep the password correct status
+        is_authed = st.session_state.get("password_correct", False)
         st.session_state.clear()
-        st.session_state.password_correct = password_correct
-        st.session_state.intro_shown = intro_shown
+        st.session_state.password_correct = is_authed
         st.rerun()
 
     if st.session_state.get("messages"):
         if st.button("נתח את כל השיחה לפי קטגוריות"):
-            # Analysis logic remains the same
             chat_history_text = "\n".join(
                 [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
             )
@@ -155,7 +119,7 @@ with st.sidebar:
                 "\n---\n" + chat_history_text + "\n---\n" + ANALYSIS_PROMPT_HE
             )
             st.info("הבקשה נשלחת לניתוח, המתן/י בסבלנות...")
-            with st.spinner("ניתוח האינטייק..."):
+            with st.spinner("מנתח את האינטייק..."):
                 try:
                     response = client.chat.completions.create(
                         model="gpt-4.1",
@@ -185,7 +149,6 @@ if not st.session_state.messages:
                 model="gpt-4.1",
                 messages=initial_prompt,
                 temperature=0.3
-
             )
             initial_message = response.choices[0].message.content
             st.session_state.messages.append({"role": "assistant", "content": initial_message})
