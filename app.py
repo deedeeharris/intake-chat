@@ -20,37 +20,28 @@ st.markdown("""
         width: 250px;
         padding: 20px;
     }
+    /* Custom CSS to move the send button to the left */
+    .stChatInput > div {
+        flex-direction: row-reverse;
+    }
     </style>
 """, unsafe_allow_html=True)
 
 # ====== Login ======
 def check_password():
     """Returns `True` if the user had the correct password."""
-
     def password_entered():
-        """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets["password"]:
+        if st.session_state.get("password") == st.secrets.get("password"):
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # don't store password
+            if "password" in st.session_state:
+                del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
-    if "password_correct" not in st.session_state:
-        # First run, show input for password.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
+    if not st.session_state.get("password_correct"):
+        st.text_input("Password", type="password", on_change=password_entered, key="password")
         return False
-    elif not st.session_state["password_correct"]:
-        # Password not correct, show input + error.
-        st.text_input(
-            "Password", type="password", on_change=password_entered, key="password"
-        )
-        st.error("😕 סיסמה לא נכונה")
-        return False
-    else:
-        # Password correct.
-        return True
+    return True
 
 if not check_password():
     st.stop()
@@ -68,34 +59,32 @@ try:
     ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"]
     INTAKE_SYSTEM_PROMPT = st.secrets["INTAKE_SYSTEM_PROMPT"]
 except KeyError as e:
-    st.error(f"Secret key not found: {e}. Please ensure ANALYSIS_PROMPT_HE and INTAKE_SYSTEM_PROMPT are set in your Streamlit secrets.")
+    st.error(f"Secret key not found: {e}. Please ensure all required secrets are set.")
     st.stop()
-
 
 # ====== Sidebar ======
 with st.sidebar:
     st.header("אפשרויות")
     if st.button("שיחה חדשה"):
+        # Clear all session state and rerun
         st.session_state.clear()
         st.rerun()
 
-    if "messages" in st.session_state and st.session_state.messages:
+    if st.session_state.get("messages"):
         if st.button("נתח את כל השיחה לפי קטגוריות"):
+            # ... (analysis logic remains the same)
             chat_history_text = "\n".join(
                 [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
             )
             gpt_prompt = (
                 "שוחחת עם מועמד/ת במסלול קדם-צבאי. להלן היסטוריית השיחה המלאה, ולאחר מכן בקשה לניתוח חינוכי דידקטי :"
-                "\n---\n"
-                + chat_history_text
-                + "\n---\n"
-                + ANALYSIS_PROMPT_HE
+                "\n---\n" + chat_history_text + "\n---\n" + ANALYSIS_PROMPT_HE
             )
-            st.info("הבקשה נשלחת לניתוח ב-GPT-4.1, המתן/י בסבלנות...")
+            st.info("הבקשה נשלחת לניתוח ב-GPT-4, המתן/י בסבלנות...")
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4.1", # Using a powerful model for analysis
+                        model="gpt-4-turbo",
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -103,56 +92,79 @@ with st.sidebar:
                         temperature=0.3,
                         max_tokens=1200
                     )
-                    analysis_result = response.choices[0].message.content
-                    st.session_state.analysis = analysis_result
+                    st.session_state.analysis = response.choices[0].message.content
                 except Exception as e:
                     st.error(f"Error during analysis: {e}")
 
-
-# ====== Chat Initialization ======
+# ====== Chat Initialization & First Message ======
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# If the chat is empty, send the initial greeting from the AI
+if not st.session_state.messages:
+    try:
+        with st.chat_message("assistant"):
+            with st.spinner("מכין את הצ'אט..."):
+                response_placeholder = st.empty()
+                full_response = ""
+                # Hidden prompt to make the AI start the conversation
+                initial_prompt = [
+                    {"role": "system", "content": INTAKE_SYSTEM_PROMPT},
+                    {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
+                ]
+                stream = client.chat.completions.create(
+                    model="gpt-4-turbo",
+                    messages=initial_prompt,
+                    stream=True,
+                )
+                for chunk in stream:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        full_response += content
+                        response_placeholder.markdown(full_response + "▌")
+                response_placeholder.markdown(full_response)
+        # Add the AI's first message to the session state
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
+    except Exception as e:
+        st.error(f"An error occurred while starting the chat: {e}")
+        st.stop()
 
-# ====== Display Chat History ======
+# ====== Display Full Chat History ======
+# This will now include the initial message on the first run
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ====== User Input ======
+# ====== Handle User Input ======
 if prompt := st.chat_input("כתבו כאן..."):
+    # Add user message to state and display it
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    # Construct the message history for the API call
-    # The system prompt is always first
+    # Prepare messages for the API call
     messages_for_api = [{"role": "system", "content": INTAKE_SYSTEM_PROMPT}]
-    # Then add all the messages from the session state
     messages_for_api.extend(st.session_state.messages)
 
     try:
-        with st.spinner("חושב..."):
-            # Call the ChatCompletion API
-            response = client.chat.completions.create(
-                model="gpt-4.1", # Specify the desired model
+        with st.chat_message("assistant"):
+            response_placeholder = st.empty()
+            full_response = ""
+            stream = client.chat.completions.create(
+                model="gpt-4-turbo",
                 messages=messages_for_api,
-                temperature=0.3, # Adjust temperature as needed for conversation
-                max_tokens=1000
+                stream=True,
             )
-            assistant_msg = response.choices[0].message.content
-
-            st.session_state.messages.append(
-                {"role": "assistant", "content": assistant_msg}
-            )
-            with st.chat_message("assistant"):
-                st.markdown(assistant_msg)
-            # We need to rerun to show the latest message immediately
-            st.rerun()
-
+            for chunk in stream:
+                content = chunk.choices[0].delta.content
+                if content:
+                    full_response += content
+                    response_placeholder.markdown(full_response + "▌")
+            response_placeholder.markdown(full_response)
+        # Add the final assistant response to the message history
+        st.session_state.messages.append({"role": "assistant", "content": full_response})
     except Exception as e:
         st.error(f"An error occurred: {e}")
-
 
 # ====== Display Analysis Result ======
 if "analysis" in st.session_state:
