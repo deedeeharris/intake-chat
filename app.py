@@ -60,6 +60,18 @@ except KeyError as e:
     st.error(f"Secret key not found: {e}. Please ensure all required secrets are set.")
     st.stop()
 
+# ====== Initial Welcome Popup (Toast) ======
+if "toast_shown" not in st.session_state:
+    st.toast("ברוכים הבאים!", icon="👋")
+    time.sleep(0.5) # A small delay to make the popups feel sequential
+    st.toast("זהו Proof of Concept (POC)", icon="💡")
+    time.sleep(0.5)
+    st.toast("המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.", icon="📝")
+    time.sleep(0.5)
+    st.toast("כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.", icon="📊")
+    st.session_state.toast_shown = True
+
+
 # ====== Sidebar ======
 with st.sidebar:
     st.header("אפשרויות")
@@ -77,11 +89,11 @@ with st.sidebar:
                 "שוחחת עם מועמד/ת במסלול קדם-צבאי. להלן היסטוריית השיחה המלאה, ולאחר מכן בקשה לניתוח חינוכי דידקטי :"
                 "\n---\n" + chat_history_text + "\n---\n" + ANALYSIS_PROMPT_HE
             )
-            st.info("הבקשה נשלחת לניתוח ב-GPT-4, המתן/י בסבלנות...")
+            st.info("הבקשה נשלחת לניתוח, המתן/י בסבלנות...")
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4-turbo",
+                        model="gpt-4.1",
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -97,7 +109,6 @@ with st.sidebar:
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# If the chat is empty, fetch the initial greeting but DO NOT display it here.
 if not st.session_state.messages:
     with st.spinner("מכין את הצ'אט..."):
         try:
@@ -106,19 +117,19 @@ if not st.session_state.messages:
                 {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
             ]
             response = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4.1",
                 messages=initial_prompt,
+                temperature=0.3
+
             )
             initial_message = response.choices[0].message.content
-            # Add the AI's first message to the session state
             st.session_state.messages.append({"role": "assistant", "content": initial_message})
-            # Rerun the script to display the message from the history
             st.rerun()
         except Exception as e:
             st.error(f"An error occurred while starting the chat: {e}")
             st.stop()
 
-# ====== Display Full Chat History (Single Source of Truth) ======
+# ====== Display Full Chat History ======
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
@@ -126,7 +137,6 @@ for msg in st.session_state.messages:
 # ====== Handle User Input ======
 if prompt := st.chat_input("כתבו כאן..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
-    # Display the user's message immediately
     with st.chat_message("user"):
         st.markdown(prompt)
 
@@ -138,7 +148,7 @@ if prompt := st.chat_input("כתבו כאן..."):
             response_placeholder = st.empty()
             full_response = ""
             stream = client.chat.completions.create(
-                model="gpt-4-turbo",
+                model="gpt-4.1",
                 messages=messages_for_api,
                 stream=True,
             )
