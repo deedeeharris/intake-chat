@@ -65,18 +65,7 @@ except Exception as e:
     st.stop()
 
 
-ANALYSIS_PROMPT_HE = """
-קיבלת צ'אט מלא של אינטייק תוכנית מכינה בעברית בין מועמד/ת לעוזר דיגיטלי.
-לסיום, נתח את תשובות המועמד/ת לפי הקטגוריות הבאות. לכל קטגוריה כתוב סיכום קצר, התייחס לכוחות, אתגרים ותפיסות עיקריות שעלו מהתשובות, וצטט תשובות רלוונטיות בקצרה:
-1. התפתחות אישית ותפיסת עצמי
-2. מוטיבציה ושאיפות
-3. מעורבות חברתית ומודעות קהילתית
-4. פתיחות וגיוון
-5. קבלת החלטות ועצמאות
-6. מידע נוסף
-
-סיים בתמצית תובנות מרכזיות על המועמד/ת בלשון מחנכים. אל תעתיק את השאלות אלא התמקד בניתוח של התוכן.
-"""
+ANALYSIS_PROMPT_HE = st.secrets["ANALYSIS_PROMPT_HE"] """
 
 # ====== Sidebar ======
 with st.sidebar:
@@ -86,19 +75,19 @@ with st.sidebar:
         st.experimental_rerun()
 
     if "messages" in st.session_state and st.session_state.messages:
-        if st.button("נתח את כל השיחה לפי קטגוריות (gpt-4.1)"):
+        if st.button("נתח את כל השיחה לפי קטגוריות"):
             chat_history_text = "\n".join(
                 [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
             )
             gpt_prompt = (
-                "שוחחת עם מועמד/ת במסלול קדם-צבאי. להלן היסטוריית השיחה המלאה, ולאחר מכן בקשה לניתוח חינוכי דידקטי לפי קטגוריות:"
+                "שוחחת עם מועמד/ת במסלול קדם-צבאי. להלן היסטוריית השיחה המלאה, ולאחר מכן בקשה לניתוח חינוכי דידקטי :"
                 "\n---\n"
                 + chat_history_text
                 + "\n---\n"
                 + ANALYSIS_PROMPT_HE
             )
             st.info("הבקשה נשלחת לניתוח ב-GPT-4.1, המתן/י בסבלנות...")
-            with st.spinner("מנתח ב-GPT-4.1..."):
+            with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
                         model="gpt-4.1",
@@ -106,7 +95,7 @@ with st.sidebar:
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
                         ],
-                        temperature=0.4,
+                        temperature=0.3,
                         max_tokens=1200
                     )
                     analysis_result = response.choices[0].message.content
@@ -143,7 +132,7 @@ if prompt := st.chat_input("כתבו כאן..."):
             role="user",
             content=prompt
         )
-        with st.spinner("האסיסטנט חושב..."):
+        with st.spinner("חושב..."):
             run = client.beta.threads.runs.create(
                 thread_id=st.session_state.thread_id,
                 assistant_id=ASSISTANT_ID,
