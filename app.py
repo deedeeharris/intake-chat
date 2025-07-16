@@ -23,6 +23,13 @@ st.markdown("""
     .stChatInput > div {
         flex-direction: row-reverse;
     }
+    /* Custom style for the dialog to ensure it is centered */
+    div[data-testid="stModal"] {
+        position: fixed;
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -60,23 +67,38 @@ except KeyError as e:
     st.error(f"Secret key not found: {e}. Please ensure all required secrets are set.")
     st.stop()
 
-# ====== Initial Welcome Popup (Toast) ======
-if "toast_shown" not in st.session_state:
-    st.toast("ברוכים הבאים!", icon="👋")
-    time.sleep(0.5) # A small delay to make the popups feel sequential
-    st.toast("זהו Proof of Concept (POC)", icon="💡")
-    time.sleep(0.5)
-    st.toast("המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.", icon="📝")
-    time.sleep(0.5)
-    st.toast("כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.", icon="📊")
-    st.session_state.toast_shown = True
+# ====== Initial Welcome Popup (Modal Dialog) ======
+@st.dialog("ברוכים הבאים!")
+def show_intro():
+    st.markdown("""
+    👋 **ברוכים הבאים!**
+
+    💡 זהו Proof of Concept (POC).
+
+    📝 המטרה: להראות שאפשר לעשות אינטייק בפורמט צ'אט במקום בטפסים.
+
+    📊 כל המידע ניתן לאיסוף, ניתוח אוטומטי, והפקת תובנות למדריכים.
+    """)
+    if st.button("הבנתי, נתחיל"):
+        st.rerun()
+
+
+if "intro_shown" not in st.session_state:
+    show_intro()
+    st.session_state.intro_shown = True
+    st.rerun()
 
 
 # ====== Sidebar ======
 with st.sidebar:
     st.header("אפשרויות")
     if st.button("שיחה חדשה"):
+        # Keep password correctness and intro shown status
+        password_correct = st.session_state.get("password_correct")
+        intro_shown = st.session_state.get("intro_shown")
         st.session_state.clear()
+        st.session_state.password_correct = password_correct
+        st.session_state.intro_shown = intro_shown
         st.rerun()
 
     if st.session_state.get("messages"):
@@ -93,7 +115,7 @@ with st.sidebar:
             with st.spinner("ניתוח האינטייק..."):
                 try:
                     response = client.chat.completions.create(
-                        model="gpt-4.1",
+                        model="gpt-4o",
                         messages=[
                             {"role": "system", "content": "אתה יועץ חינוכי, מראיין, ומסכם צ'אט אינטייק למועמד/ת בגישה מקצועית בעברית."},
                             {"role": "user", "content": gpt_prompt}
@@ -117,7 +139,7 @@ if not st.session_state.messages:
                 {"role": "user", "content": "Please start the conversation in Hebrew by introducing yourself and asking your first question."}
             ]
             response = client.chat.completions.create(
-                model="gpt-4.1",
+                model="gpt-4o",
                 messages=initial_prompt,
                 temperature=0.3
 
@@ -148,7 +170,7 @@ if prompt := st.chat_input("כתבו כאן..."):
             response_placeholder = st.empty()
             full_response = ""
             stream = client.chat.completions.create(
-                model="gpt-4.1",
+                model="gpt-4o",
                 messages=messages_for_api,
                 stream=True,
             )
